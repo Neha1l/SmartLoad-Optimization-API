@@ -1,0 +1,96 @@
+package org.example.service;
+
+import org.example.model.*;
+import org.junit.jupiter.api.Test;
+
+import java.time.LocalDate;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class LoadOptimizerServiceTest {
+    private final LoadOptimizerService service = new LoadOptimizerService();
+
+    @Test
+    void validOrders_shouldReturnBestCombination() {
+        var truck = new Truck("truck-1", 20000, 2000);
+        var o1 = new Order("o1", 10000, 10000, 1000, "A", "B", LocalDate.now(), LocalDate.now().plusDays(1), false);
+        var o2 = new Order("o2", 20000, 9000, 900, "A", "B", LocalDate.now(), LocalDate.now().plusDays(1), false);
+        var o3 = new Order("o3", 5000, 5000, 500, "A", "B", LocalDate.now(), LocalDate.now().plusDays(1), false);
+        var req = new OptimizeRequest(truck, List.of(o1, o2, o3));
+        var resp = service.optimize(req);
+        assertEquals("truck-1", resp.truckId());
+        assertTrue(resp.selectedOrderIds().contains("o1") || resp.selectedOrderIds().contains("o2"));
+        assertTrue(resp.totalPayoutCents() > 0);
+        assertTrue(resp.totalWeightLbs() <= 20000);
+        assertTrue(resp.totalVolumeCuft() <= 2000);
+    }
+
+    @Test
+    void emptyOrders_shouldReturnEmptyResponse() {
+        var truck = new Truck("truck-1", 20000, 2000);
+        var req = new OptimizeRequest(truck, List.of());
+        var resp = service.optimize(req);
+        assertEquals(0, resp.totalPayoutCents());
+        assertEquals(0, resp.selectedOrderIds().size());
+    }
+
+    @Test
+    void hazmatAndNormalOrders_shouldIsolateHazmat() {
+        var truck = new Truck("truck-1", 50000, 5000);
+        var hazmat = new Order("haz", 10000, 10000, 1000, "A", "B", LocalDate.now(), LocalDate.now().plusDays(1), true);
+        var normal = new Order("norm", 20000, 10000, 1000, "A", "B", LocalDate.now(), LocalDate.now().plusDays(1), false);
+        var req = new OptimizeRequest(truck, List.of(hazmat, normal));
+        var resp = service.optimize(req);
+        assertEquals(1, resp.selectedOrderIds().size());
+        assertTrue(resp.selectedOrderIds().contains("norm") || resp.selectedOrderIds().contains("haz"));
+    }
+
+    @Test
+    void invalidRequest_shouldThrowException() {
+        assertThrows(NullPointerException.class, () -> service.optimize(null));
+        assertThrows(NullPointerException.class, () -> service.optimize(new OptimizeRequest(null, null)));
+    }
+
+    @Test
+    void allOrdersTooHeavy_shouldReturnEmptyResponse() {
+        var truck = new Truck("truck-1", 1000, 100);
+        var o1 = new Order("o1", 10000, 2000, 200, "A", "B", LocalDate.now(), LocalDate.now().plusDays(1), false);
+        var o2 = new Order("o2", 20000, 3000, 300, "A", "B", LocalDate.now(), LocalDate.now().plusDays(1), false);
+        var req = new OptimizeRequest(truck, List.of(o1, o2));
+        var resp = service.optimize(req);
+        assertEquals(0, resp.totalPayoutCents());
+        assertEquals(0, resp.selectedOrderIds().size());
+    }
+
+    @Test
+    void allOrdersTooLargeVolume_shouldReturnEmptyResponse() {
+        var truck = new Truck("truck-1", 1000, 100);
+        var o1 = new Order("o1", 10000, 500, 200, "A", "B", LocalDate.now(), LocalDate.now().plusDays(1), false);
+        var o2 = new Order("o2", 20000, 500, 300, "A", "B", LocalDate.now(), LocalDate.now().plusDays(1), false);
+        var req = new OptimizeRequest(truck, List.of(o1, o2));
+        var resp = service.optimize(req);
+        assertEquals(0, resp.totalPayoutCents());
+        assertEquals(0, resp.selectedOrderIds().size());
+    }
+
+    @Test
+    void incompatibleOriginDestination_shouldReturnOnlyCompatibleOrders() {
+        var truck = new Truck("truck-1", 20000, 2000);
+        var o1 = new Order("o1", 10000, 10000, 1000, "A", "B", LocalDate.now(), LocalDate.now().plusDays(1), false);
+        var o2 = new Order("o2", 20000, 9000, 900, "X", "Y", LocalDate.now(), LocalDate.now().plusDays(1), false);
+        var req = new OptimizeRequest(truck, List.of(o1, o2));
+        var resp = service.optimize(req);
+        assertEquals(1, resp.selectedOrderIds().size());
+        assertTrue(resp.selectedOrderIds().contains("o1"));
+    }
+
+    @Test
+    void pickupAfterDelivery_shouldReturnEmptyResponse() {
+        var truck = new Truck("truck-1", 20000, 2000);
+        var o1 = new Order("o1", 10000, 10000, 1000, "A", "B", LocalDate.now().plusDays(2), LocalDate.now(), false);
+        var req = new OptimizeRequest(truck, List.of(o1));
+        var resp = service.optimize(req);
+        assertEquals(0, resp.selectedOrderIds().size());
+    }
+}
