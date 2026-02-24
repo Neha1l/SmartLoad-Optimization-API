@@ -1,0 +1,28 @@
+package org.example.controller;
+
+import org.example.model.OptimizeRequest;
+import org.example.model.OptimizeResponseRecord;
+import org.example.service.LoadOptimizerService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/v1/load-optimizer")
+public class LoadOptimizerController {
+    private final LoadOptimizerService optimizerService;
+
+    public LoadOptimizerController(LoadOptimizerService optimizerService) {
+        this.optimizerService = optimizerService;
+    }
+
+    @PostMapping(path = "/optimize", consumes = "application/json", produces = "application/json")
+    public ResponseEntity<?> optimize(@RequestBody OptimizeRequest request) {
+        try {
+            return ResponseEntity.ok(optimizerService.optimize(request));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Internal error");
+        }
+    }
+}
