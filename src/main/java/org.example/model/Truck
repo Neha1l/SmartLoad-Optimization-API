@@ -1,0 +1,9 @@
+package org.example.model;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+public record Truck(
+    @JsonProperty("id") String id,
+    @JsonProperty("max_weight_lbs") long maxWeightLbs,
+    @JsonProperty("max_volume_cuft") long maxVolumeCuft
+) {}
